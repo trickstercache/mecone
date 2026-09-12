@@ -143,3 +143,41 @@ tests:
           status: 200
           body: malformed target ignored
           forwarded: false
+
+  - id: targeted-unknown-directive-still-overrides
+    title: A targeted field the cache does not recognize still replaces Cache-Control
+    level: must
+    refs: [RFC9213#2.1, RFC9213#3]
+    requires: [targeted-cdn-cache-control-is-used]
+    responses:
+      suppressed:
+        headers:
+          - "Cache-Control: public, max-age=3600"
+          - "CDN-Cache-Control: none"
+        body: not for the cdn to keep
+    steps:
+      - arrange: true
+        expect: {forwarded: true}
+      - expect:
+          status: 200
+          body: not for the cdn to keep
+          forwarded: true
+
+  - id: targeted-overrides-an-uncacheable-cache-control
+    title: A targeted field permits reuse that Cache-Control alone would have forbidden
+    level: may
+    refs: [RFC9213#2.2, RFC9213#3]
+    requires: [targeted-cdn-cache-control-is-used]
+    responses:
+      permitted:
+        headers:
+          - "Cache-Control: no-store"
+          - "CDN-Cache-Control: max-age=3600"
+        body: the cdn may keep this
+    steps:
+      - arrange: true
+        expect: {forwarded: true}
+      - expect:
+          status: 200
+          body: the cdn may keep this
+          forwarded: false

@@ -3,6 +3,29 @@ title: Secondary cache keys
 description: Which stored response, if any, may answer a request when Vary is in play.
 refs: [RFC9111#4.1]
 tests:
+  - id: vary-concurrent-cold-misses-remain-isolated
+    title: Concurrent cold misses selected by Vary receive their own representations
+    level: must
+    refs: [RFC9111#4.1, RFC9110#12.5.5]
+    responses:
+      alpha:
+        headers: ["Cache-Control: max-age=3600", "Vary: X-Mecone-Select"]
+        body: alpha representation
+        delay: 200ms
+      beta:
+        headers: ["Cache-Control: max-age=3600", "Vary: X-Mecone-Select"]
+        body: beta representation
+        delay: 200ms
+    steps:
+      - parallel: true
+        headers: ["X-Mecone-Select: alpha"]
+        respond_with: alpha
+        expect: {status: 200, body: alpha representation, forwarded: true}
+      - parallel: true
+        headers: ["X-Mecone-Select: beta"]
+        respond_with: beta
+        expect: {status: 200, body: beta representation, forwarded: true}
+
   - id: vary-mismatched-field-is-not-reused
     title: A stored response is not reused when a field named in Vary differs
     level: must

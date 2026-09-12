@@ -42,9 +42,10 @@ import (
 )
 
 const (
-	proxyURL     = "http://proxy"
-	wrongVersion = protocol.Version + 1
-	e2eGroup     = `group: basics
+	proxyURL          = "http://proxy"
+	wrongVersion      = protocol.Version + 1
+	parallelStepCount = 2
+	e2eGroup          = `group: basics
 title: Basics
 refs: [RFC9110#9.3.1]
 tests:
@@ -358,6 +359,42 @@ func TestStepRecords(t *testing.T) {
 	if miss.Reused || !hit.Reused {
 		t.Errorf("connection reused: miss %v, hit %v", miss.Reused, hit.Reused)
 	}
+}
+
+func TestParallelStepsStartTogether(t *testing.T) {
+	var mu sync.Mutex
+	arrived := none
+	ready := make(chan struct{})
+	ts := httptest.NewServer(overlapHandler(&mu, &arrived, ready))
+	defer ts.Close()
+	u, err := url.Parse(ts.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := &Runner{target: u}
+	steps := []*testdef.Step{{Parallel: true}, {Parallel: true}}
+	obs := r.sendSteps(t.Context(), ts.Client(), "parallel", steps)
+	for i, o := range obs {
+		if o.Err != nil || o.Status != http.StatusOK {
+			t.Errorf("step %d: status %d, error %v", i+1, o.Status, o.Err)
+		}
+	}
+}
+
+func overlapHandler(mu *sync.Mutex, arrived *int, ready chan struct{}) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		mu.Lock()
+		*arrived++
+		if *arrived == parallelStepCount {
+			close(ready)
+		}
+		mu.Unlock()
+		select {
+		case <-ready:
+		case <-time.After(time.Second):
+			http.Error(w, "requests did not overlap", http.StatusGatewayTimeout)
+		}
+	})
 }
 
 func TestRunCanceled(t *testing.T) {

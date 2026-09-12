@@ -3,6 +3,36 @@ title: Serving stale responses
 description: The stale-while-revalidate and stale-if-error cache directives.
 refs: [RFC5861]
 tests:
+  - id: stale-background-refresh-keeps-active-validator
+    title: A background refresh does not change the validator of the stale response being served
+    level: must
+    refs: [RFC9110#13.1.2, RFC5861#3]
+    requires: [stale-while-revalidate-serves-stale]
+    responses:
+      original:
+        headers:
+          - "Cache-Control: max-age=1, stale-while-revalidate=60"
+          - 'ETag: "old"'
+        body: old representation
+      updated:
+        headers:
+          - "Cache-Control: max-age=3600"
+          - 'ETag: "new"'
+        body_size: 16777216
+        ignore_conditionals: true
+    steps:
+      - arrange: true
+        respond_with: original
+        expect: {status: 200, forwarded: true}
+      - wait: 2s
+      - arrange: true
+        respond_with: updated
+        expect: {status: 200, body: old representation}
+      - wait: 1ms
+      - headers: ['If-None-Match: "new"']
+        respond_with: updated
+        expect: {status: 200, body: old representation}
+
   - id: stale-while-revalidate-serves-stale
     title: A stale response within the stale-while-revalidate window is served as it is
     level: may

@@ -194,7 +194,7 @@ func (s *Step) validateWait() []error {
 }
 
 func (s *Step) sendsRequest() bool {
-	return s.Method != unset || s.Path != unset || s.Query != unset || s.Body != unset || len(s.Headers) > none ||
+	return s.Parallel || s.Method != unset || s.Path != unset || s.Query != unset || s.Body != unset || len(s.Headers) > none ||
 		s.RespondWith != unset || s.Arrange || s.Expect != nil
 }
 

@@ -3,6 +3,44 @@ title: Freshness and age
 description: How long a stored response may be reused, and how its age is reported.
 refs: [RFC9111#4.2]
 tests:
+  - id: freshness-must-revalidate-defeats-stale-if-error
+    title: must-revalidate prevents stale-if-error from replacing an origin error
+    level: must
+    refs: [RFC9111#4.2.4, RFC9111#5.2.2.2, RFC5861#4]
+    responses:
+      guarded:
+        headers: ["Cache-Control: max-age=1, must-revalidate, stale-if-error=300"]
+        body: stale body
+      broken:
+        status: 503
+        body: origin error
+    steps:
+      - arrange: true
+        respond_with: guarded
+        expect: {forwarded: true}
+      - wait: 2s
+      - respond_with: broken
+        expect: {status: 503, body: origin error, forwarded: true}
+
+  - id: freshness-s-maxage-defeats-stale-while-revalidate
+    title: s-maxage prevents a shared cache from serving stale without validation
+    level: must
+    refs: [RFC9111#4.2.4, RFC9111#5.2.2.10, RFC5861#3]
+    responses:
+      guarded:
+        headers: ["Cache-Control: s-maxage=1, stale-while-revalidate=300"]
+        body: stale body
+      updated:
+        headers: ["Cache-Control: s-maxage=3600"]
+        body: updated body
+    steps:
+      - arrange: true
+        respond_with: guarded
+        expect: {forwarded: true}
+      - wait: 2s
+      - respond_with: updated
+        expect: {status: 200, body: updated body, forwarded: true}
+
   - id: freshness-age-on-reuse
     title: A response served from storage carries an Age header
     level: must
@@ -240,3 +278,35 @@ tests:
         expect: {forwarded: true}
       - headers: ["Cache-Control: min-fresh=3600"]
         expect: {forwarded: true}
+
+  - id: freshness-duplicate-max-age-uses-the-first
+    title: A repeated max-age does not relax the first value
+    level: should
+    refs: [RFC9111#4.2.1, RFC9110#5.3]
+    responses:
+      conflicting:
+        headers: ["Cache-Control: max-age=0, max-age=3600"]
+        body: the first value stands
+    steps:
+      - arrange: true
+        expect: {forwarded: true}
+      - expect:
+          status: 200
+          forwarded: true
+
+  - id: freshness-duplicate-max-age-keeps-a-usable-first-value
+    title: A repeated max-age keeps the first value when that value permits reuse
+    level: may
+    refs: [RFC9111#4.2.1, RFC9110#5.3]
+    requires: [storage-reuse-fresh]
+    responses:
+      conflicting:
+        headers: ["Cache-Control: max-age=3600, max-age=0"]
+        body: the first value stands
+    steps:
+      - arrange: true
+        expect: {forwarded: true}
+      - expect:
+          status: 200
+          body: the first value stands
+          forwarded: false

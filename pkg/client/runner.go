@@ -43,6 +43,7 @@ import (
 const (
 	none               = 0
 	first              = 0
+	stepIncrement      = 1
 	defaultConcurrency = 8
 	defaultTimeout     = 30 * time.Second
 	maxBody            = 16 << 20
@@ -248,16 +249,51 @@ func (r *Runner) exercise(ctx context.Context, res results.Result, t *testdef.Te
 
 func (r *Runner) sendSteps(ctx context.Context, hc *http.Client, id string, steps []*testdef.Step) []check.Observation {
 	obs := make([]check.Observation, len(steps))
-	for i, s := range steps {
-		if s.IsWait() {
-			if !sleep(ctx, time.Duration(*s.Wait)) {
-				break
-			}
-			continue
-		}
-		obs[i] = r.send(ctx, hc, id, i+1, s)
+	for i := first; i < len(steps); {
+		i = r.sendStepGroup(ctx, hc, id, steps, obs, i)
 	}
 	return obs
+}
+
+func (r *Runner) sendStepGroup(ctx context.Context, hc *http.Client, id string,
+	steps []*testdef.Step, obs []check.Observation, i int,
+) int {
+	s := steps[i]
+	if s.IsWait() {
+		if sendWait(ctx, s) {
+			return i + stepIncrement
+		}
+		return len(steps)
+	}
+	if s.Parallel {
+		end := parallelEnd(steps, i)
+		r.sendParallel(ctx, hc, id, steps, obs, i, end)
+		return end
+	}
+	obs[i] = r.send(ctx, hc, id, i+1, s)
+	return i + stepIncrement
+}
+
+func sendWait(ctx context.Context, step *testdef.Step) bool {
+	return sleep(ctx, time.Duration(*step.Wait))
+}
+
+func parallelEnd(steps []*testdef.Step, start int) int {
+	end := start
+	for end < len(steps) && !steps[end].IsWait() && steps[end].Parallel {
+		end++
+	}
+	return end
+}
+
+func (r *Runner) sendParallel(ctx context.Context, hc *http.Client, id string,
+	steps []*testdef.Step, obs []check.Observation, start, end int,
+) {
+	var wg sync.WaitGroup
+	for n := start; n < end; n++ {
+		wg.Go(func() { obs[n] = r.send(ctx, hc, id, n+1, steps[n]) })
+	}
+	wg.Wait()
 }
 
 func (r *Runner) send(ctx context.Context, hc *http.Client, id string, n int, s *testdef.Step) check.Observation {

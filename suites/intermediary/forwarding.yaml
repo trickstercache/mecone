@@ -130,3 +130,39 @@ tests:
         expect:
           forwarded: true
           forwarded_headers: ["Max-Forwards: ~^[0-4]$"]
+
+  - id: forwarding-connection-scoped-cache-control-is-dropped
+    title: A Cache-Control the origin scoped to its connection does not govern storage
+    level: must
+    refs: [RFC9110#7.6.1, RFC9111#3]
+    protocols: [h1]
+    responses:
+      hop-scoped:
+        headers:
+          - "Connection: Cache-Control"
+          - "Cache-Control: max-age=3600"
+        body: scoped to the hop
+    steps:
+      - arrange: true
+        expect: {forwarded: true}
+      - expect:
+          status: 200
+          forwarded: true
+          headers_absent: [Cache-Control]
+
+  - id: forwarding-connection-scoped-via-does-not-remove-this-hop
+    title: An origin naming Via in Connection does not remove the proxy's own Via
+    level: must
+    refs: [RFC9110#7.6.1, RFC9110#7.6.3]
+    protocols: [h1]
+    requires: [forwarding-adds-via-to-responses]
+    responses:
+      hop-scoped:
+        headers:
+          - "Connection: Via"
+          - "Via: 1.1 origin-hop"
+        body: via is hop scoped
+    steps:
+      - expect:
+          status: 200
+          headers: ["Via: ~1\\.1[ \\t]+\\S"]

@@ -3,6 +3,22 @@ title: Ranges from a stored response
 description: Range requests answered from a complete response the proxy already holds.
 refs: [RFC9110#14]
 tests:
+  - id: ranges-stored-if-range-mismatch-needs-full-response
+    title: A mismatched If-Range fetches a complete response when only a partial response is stored
+    level: must
+    refs: [RFC9110#13.1.5, RFC9110#14.2]
+    responses:
+      alphabet:
+        headers: ["Cache-Control: max-age=3600", 'ETag: "current"']
+        body: 0123456789abcdefghij
+        ranges: true
+    steps:
+      - arrange: true
+        headers: ["Range: bytes=0-4"]
+        expect: {status: 206, body: "01234", forwarded: true}
+      - headers: ["Range: bytes=0-4", 'If-Range: "obsolete"']
+        expect: {status: 200, body: 0123456789abcdefghij, forwarded: true}
+
   - id: ranges-stored-suffix
     title: A suffix range is served from a stored complete response
     level: may

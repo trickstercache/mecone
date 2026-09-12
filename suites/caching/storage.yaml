@@ -3,6 +3,44 @@ title: Storing responses
 description: Whether the proxy keeps a response for reuse, and when it must not.
 refs: [RFC9111#3]
 tests:
+  - id: storage-replacement-renews-authorized-shareability
+    title: A replacement response independently authorizes shared reuse after authentication
+    level: must
+    refs: [RFC9111#3.5]
+    responses:
+      shared-old:
+        headers: ["Cache-Control: public, max-age=1", 'ETag: "old"']
+        body: old shared response
+      private-new:
+        headers: ["Cache-Control: max-age=3600", 'ETag: "new"']
+        body: new credential response
+    steps:
+      - arrange: true
+        headers: ["Authorization: Basic bWVjb25lOnRlc3Q="]
+        respond_with: shared-old
+        expect: {forwarded: true}
+      - wait: 2s
+      - arrange: true
+        headers: ["Authorization: Basic bWVjb25lOnRlc3Q="]
+        respond_with: private-new
+        expect: {status: 200, body: new credential response, forwarded: true}
+      - respond_with: private-new
+        expect: {forwarded: true}
+
+  - id: storage-authorized-negative-response-is-not-shared
+    title: A cached negative response to an authorized request is not shared
+    level: must
+    refs: [RFC9111#3.5]
+    responses:
+      denied:
+        status: 404
+        body: private absence
+    steps:
+      - arrange: true
+        headers: ["Authorization: Basic bWVjb25lOnRlc3Q="]
+        expect: {status: 404, forwarded: true}
+      - expect: {status: 404, forwarded: true}
+
   - id: storage-no-store
     title: A response marked no-store is never reused
     level: must

@@ -3,6 +3,72 @@ title: Invalidation
 description: What an unsafe request does to responses the proxy already holds.
 refs: [RFC9111#4.4]
 tests:
+  - id: invalidation-removes-every-vary-variant
+    title: A successful unsafe request invalidates every stored variant of the target URI
+    level: must
+    refs: [RFC9111#4.4]
+    responses:
+      alpha-old:
+        headers: ["Cache-Control: max-age=3600", "Vary: X-Mecone-Select"]
+        body: alpha before update
+      beta-old:
+        headers: ["Cache-Control: max-age=3600", "Vary: X-Mecone-Select"]
+        body: beta before update
+      accepted: {status: 204}
+      alpha-new:
+        headers: ["Cache-Control: max-age=3600", "Vary: X-Mecone-Select"]
+        body: alpha after update
+      beta-new:
+        headers: ["Cache-Control: max-age=3600", "Vary: X-Mecone-Select"]
+        body: beta after update
+    steps:
+      - arrange: true
+        headers: ["X-Mecone-Select: alpha"]
+        respond_with: alpha-old
+        expect: {forwarded: true}
+      - arrange: true
+        headers: ["X-Mecone-Select: beta"]
+        respond_with: beta-old
+        expect: {forwarded: true}
+      - arrange: true
+        method: PUT
+        body: replacement
+        respond_with: accepted
+        expect: {status: 204, forwarded: true}
+      - arrange: true
+        headers: ["X-Mecone-Select: alpha"]
+        respond_with: alpha-new
+        expect: {body: alpha after update, forwarded: true}
+      - headers: ["X-Mecone-Select: beta"]
+        respond_with: beta-new
+        expect: {body: beta after update, forwarded: true}
+
+  - id: invalidation-auth-write-removes-shared-response
+    title: A successful authenticated write invalidates a shared stored response
+    level: must
+    refs: [RFC9111#3.5, RFC9111#4.4]
+    responses:
+      before:
+        headers: ["Cache-Control: public, max-age=3600"]
+        body: before update
+      accepted: {status: 204}
+      after:
+        headers: ["Cache-Control: public, max-age=3600"]
+        body: after update
+    steps:
+      - arrange: true
+        headers: ["Authorization: Basic bWVjb25lOnRlc3Q="]
+        respond_with: before
+        expect: {forwarded: true}
+      - arrange: true
+        method: PUT
+        headers: ["Authorization: Basic bWVjb25lOnRlc3Q="]
+        body: replacement
+        respond_with: accepted
+        expect: {status: 204, forwarded: true}
+      - respond_with: after
+        expect: {body: after update, forwarded: true}
+
   - id: invalidation-unsafe-method-invalidates-target-uri
     title: A successful unsafe request invalidates the stored response for its target URI
     level: must

@@ -101,6 +101,7 @@ var invalidTests = map[string]func(*Test){
 	"nil step":             func(x *Test) { x.Steps = append(x.Steps, nil) },
 	"zero wait":            func(x *Test) { x.Steps = append(x.Steps, &Step{Wait: new(noDelay)}) },
 	"wait with request":    func(x *Test) { x.Steps = append(x.Steps, &Step{Wait: new(Duration(time.Second)), Path: "/x"}) },
+	"parallel wait":        func(x *Test) { x.Steps = append(x.Steps, &Step{Wait: new(Duration(time.Second)), Parallel: true}) },
 	"bad method":           withStep(func(s *Step) { s.Method = "GE T" }),
 	"bad path":             withStep(func(s *Step) { s.Path = "x?y" }),
 	"bad query":            withStep(func(s *Step) { s.Query = "a#b" }),

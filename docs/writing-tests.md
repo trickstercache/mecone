@@ -103,6 +103,20 @@ steps:
       forwarded: false
 ```
 
+Adjacent request steps with `parallel: true` start concurrently. Use this for
+requirements involving collapsed forwarding or simultaneous cache access;
+expectations and origin responses still belong to each step independently.
+
+```yaml
+steps:
+  - parallel: true
+    headers: ["X-Mecone-Select: alpha"]
+    respond_with: alpha
+  - parallel: true
+    headers: ["X-Mecone-Select: beta"]
+    respond_with: beta
+```
+
 **`arrange`** marks a step whose only job is to set up the scenario. If its expectations fail
 (or its request fails), the outcome is *inconclusive* rather than *fail*: the proxy never got
 into the state the test is about.

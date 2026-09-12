@@ -1,0 +1,53 @@
+group: collapsing
+title: Collapsed requests
+description: What each of several concurrent requests for one resource receives.
+refs: [RFC9111#4]
+tests:
+  - id: collapsing-range-waiters-receive-the-requested-extent
+    title: Concurrent identical range requests each receive the requested extent
+    level: must
+    refs: [RFC9110#14.2, RFC9111#4]
+    requires: [storage-reuse-fresh]
+    responses:
+      alphabet:
+        headers: ["Cache-Control: max-age=3600"]
+        body: 0123456789abcdefghij
+        ranges: true
+    steps:
+      - arrange: true
+        expect: {forwarded: true}
+      - parallel: true
+        headers: ["Range: bytes=0-4"]
+        expect:
+          status: 206
+          headers: ["Content-Range: bytes 0-4/20"]
+          body: "01234"
+      - parallel: true
+        headers: ["Range: bytes=0-4"]
+        expect:
+          status: 206
+          headers: ["Content-Range: bytes 0-4/20"]
+          body: "01234"
+
+  - id: collapsing-conditional-waiters-receive-no-content
+    title: Concurrent conditional requests answered from storage each receive an empty body
+    level: must
+    refs: [RFC9111#4.3.2, RFC9110#15.4.5]
+    requires: [storage-reuse-fresh]
+    responses:
+      tagged:
+        headers: ["Cache-Control: max-age=3600", 'ETag: "v1"']
+        body: the stored body
+    steps:
+      - arrange: true
+        expect: {forwarded: true}
+      - parallel: true
+        headers: ['If-None-Match: "v1"']
+        expect:
+          status: 304
+          body: ""
+      - parallel: true
+        headers: ['If-None-Match: "v1"']
+        expect:
+          status: 304
+          body: ""

@@ -69,6 +69,8 @@ type Interim struct {
 // Step is either a pause (Wait) or one request sent through the proxy with its expectations.
 type Step struct {
 	Wait *Duration `yaml:"wait,omitempty"`
+	// Parallel runs this request concurrently with adjacent steps that also set parallel.
+	Parallel bool `yaml:"parallel,omitempty"`
 
 	Method  string   `yaml:"method,omitempty"`
 	Path    string   `yaml:"path,omitempty"`
