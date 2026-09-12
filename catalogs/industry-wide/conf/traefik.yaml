@@ -1,0 +1,18 @@
+# Traefik static configuration. The open-source build has no HTTP cache, so this forwards only.
+
+entryPoints:
+  web:
+    address: ":${LISTEN_PORT}"
+
+providers:
+  file:
+    filename: /etc/traefik/dynamic.yaml
+
+log:
+  level: INFO
+
+# empty config sends the access log to stdout
+accessLog: {}
+
+api:
+  dashboard: false

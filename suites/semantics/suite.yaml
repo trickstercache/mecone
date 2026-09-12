@@ -1,0 +1,5 @@
+id: semantics
+title: HTTP Message Semantics
+description: >-
+  Observable method, status, content, and framing semantics across HTTP versions, per RFC 9110,
+  RFC 9112, and RFC 9113.

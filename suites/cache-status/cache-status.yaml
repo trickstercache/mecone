@@ -1,0 +1,98 @@
+group: cache-status
+title: The Cache-Status field
+description: Whether the proxy reports how it handled a request, and whether that report is well formed.
+refs: [RFC9211#2]
+tests:
+  - id: cache-status-is-present
+    title: The proxy describes its handling of a request in Cache-Status
+    level: may
+    refs: [RFC9211#2]
+    responses:
+      cacheable:
+        headers: ["Cache-Control: max-age=3600"]
+        body: reported on
+    steps:
+      - expect:
+          status: 200
+          headers: [Cache-Status]
+
+  - id: cache-status-identifies-the-cache
+    title: The first Cache-Status member starts with a string or token identifying the cache
+    level: must
+    refs: [RFC9211#2]
+    requires: [cache-status-is-present]
+    steps:
+      - expect:
+          status: 200
+          headers: ["Cache-Status: ~^[ \\t]*(?:\"(?:[^\"\\\\]|\\\\[\"\\\\])*\"|[A-Za-z*][A-Za-z0-9!#$%&'*+.^_`|~:/-]*)[ \\t]*(?:[;,]|$)"]
+
+  - id: cache-status-reports-a-forward-reason
+    title: A request that went to the origin is reported with fwd
+    level: may
+    refs: [RFC9211#2.2]
+    requires: [cache-status-is-present]
+    steps:
+      - expect:
+          forwarded: true
+          headers: ["Cache-Status: ~(?i);[ \\t]*fwd[ \\t]*=[ \\t]*[A-Za-z*][A-Za-z0-9!#$%&'*+.^_`|~:/-]*"]
+
+  - id: cache-status-reports-a-hit
+    title: A request answered from storage is reported with hit
+    level: may
+    refs: [RFC9211#2.1]
+    requires: [cache-status-is-present, storage-reuse-fresh]
+    responses:
+      cacheable:
+        headers: ["Cache-Control: max-age=3600"]
+        body: reported as a hit
+    steps:
+      - arrange: true
+        expect: {forwarded: true}
+      - expect:
+          forwarded: false
+          headers: ['Cache-Status: ~(?i);[ \t]*hit(?:[ \t]*=[ \t]*\?1)?[ \t]*(?:[;,]|$)']
+
+  - id: cache-status-reports-ttl-on-hit
+    title: A cache can report a stored response's remaining freshness lifetime
+    level: may
+    refs: [RFC9211#2.4]
+    requires: [cache-status-reports-a-hit]
+    responses:
+      cacheable:
+        headers: ["Cache-Control: max-age=3600"]
+        body: lifetime reported
+    steps:
+      - arrange: true
+        expect: {forwarded: true}
+      - expect:
+          forwarded: false
+          headers: ['Cache-Status: ~(?i);[ \t]*ttl[ \t]*=[ \t]*-?[0-9]+']
+
+  - id: cache-status-reports-forwarded-status
+    title: A cache can report the status received from the next hop
+    level: may
+    refs: [RFC9211#2.3]
+    requires: [cache-status-is-present]
+    responses:
+      unavailable:
+        status: 503
+        body: unavailable
+    steps:
+      - expect:
+          status: 503
+          forwarded: true
+          headers: ['Cache-Status: ~(?i);[ \t]*fwd-status[ \t]*=[ \t]*503(?:[ \t]*[;,]|[ \t]*$)']
+
+  - id: cache-status-reports-storage-on-miss
+    title: A cache can report that it stored a forwarded response
+    level: may
+    refs: [RFC9211#2.5]
+    requires: [cache-status-is-present, storage-reuse-fresh]
+    responses:
+      cacheable:
+        headers: ["Cache-Control: max-age=3600"]
+        body: stored on miss
+    steps:
+      - expect:
+          forwarded: true
+          headers: ['Cache-Status: ~(?i);[ \t]*stored(?:[ \t]*=[ \t]*\?1)?[ \t]*(?:[;,]|$)']

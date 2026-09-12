@@ -1,0 +1,56 @@
+version: "2"
+issues:
+  fix: true
+  max-issues-per-linter: 0
+  max-same-issues: 0
+linters:
+  enable:
+    - dupl
+    - errcheck
+    - errorlint
+    - exptostd
+    - gocheckcompilerdirectives
+    - goconst
+    - gocritic
+    - gosec
+    - grouper
+    - importas
+    - intrange
+    - lll
+    - mirror
+    - misspell
+    - modernize
+    - perfsprint
+    - promlinter
+    - revive
+    - staticcheck
+    - testifylint
+    - unconvert
+    - unused
+    - usestdlibvars
+    - usetesting
+    - wastedassign
+    - whitespace
+  settings:
+    lll:
+      line-length: 180
+    staticcheck:
+      checks:
+        - all
+    revive:
+      enable-all-rules: true
+      rules:
+        - name: line-length-limit
+          arguments: [180]
+formatters:
+  enable:
+    - gci
+    - goimports
+    - gofumpt
+  settings:
+    gci:
+      custom-order: true
+      sections:
+        - standard
+        - prefix(github.com/trickstercache)
+        - default

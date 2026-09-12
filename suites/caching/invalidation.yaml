@@ -1,0 +1,91 @@
+group: invalidation
+title: Invalidation
+description: What an unsafe request does to responses the proxy already holds.
+refs: [RFC9111#4.4]
+tests:
+  - id: invalidation-unsafe-method-invalidates-target-uri
+    title: A successful unsafe request invalidates the stored response for its target URI
+    level: must
+    refs: [RFC9111#4.4]
+    responses:
+      cacheable:
+        headers: ["Cache-Control: max-age=3600"]
+        body: stored before the write
+      accepted:
+        status: 200
+        body: write accepted
+    steps:
+      - arrange: true
+        respond_with: cacheable
+        expect: {forwarded: true}
+      - arrange: true
+        method: POST
+        body: payload
+        respond_with: accepted
+        expect: {status: 200, forwarded: true}
+      - respond_with: cacheable
+        expect: {forwarded: true}
+
+  - id: invalidation-delete-invalidates-target-uri
+    title: A successful DELETE invalidates the stored response for its target URI
+    level: must
+    refs: [RFC9111#4.4]
+    responses:
+      cacheable:
+        headers: ["Cache-Control: max-age=3600"]
+        body: stored before the delete
+      deleted:
+        status: 204
+    steps:
+      - arrange: true
+        respond_with: cacheable
+        expect: {forwarded: true}
+      - arrange: true
+        method: DELETE
+        respond_with: deleted
+        expect: {status: 204, forwarded: true}
+      - respond_with: cacheable
+        expect: {forwarded: true}
+
+  - id: invalidation-put-invalidates-target-uri
+    title: A successful PUT invalidates the stored response for its target URI
+    level: must
+    refs: [RFC9111#4.4]
+    responses:
+      cacheable:
+        headers: ["Cache-Control: max-age=3600"]
+        body: stored before the put
+      updated:
+        status: 204
+    steps:
+      - arrange: true
+        respond_with: cacheable
+        expect: {forwarded: true}
+      - arrange: true
+        method: PUT
+        body: replacement
+        respond_with: updated
+        expect: {status: 204, forwarded: true}
+      - respond_with: cacheable
+        expect: {forwarded: true}
+
+  - id: invalidation-unknown-method-invalidates-target-uri
+    title: A successful method of unknown safety invalidates the stored target URI
+    level: must
+    refs: [RFC9111#4.4]
+    responses:
+      cacheable:
+        headers: ["Cache-Control: max-age=3600"]
+        body: stored before the extension method
+      accepted:
+        status: 204
+    steps:
+      - arrange: true
+        respond_with: cacheable
+        expect: {forwarded: true}
+      - arrange: true
+        method: MECONE-UPDATE
+        respond_with: accepted
+        expect: {status: 204, forwarded: true}
+      - respond_with: cacheable
+        expect: {forwarded: true}

@@ -1,0 +1,242 @@
+group: freshness
+title: Freshness and age
+description: How long a stored response may be reused, and how its age is reported.
+refs: [RFC9111#4.2]
+tests:
+  - id: freshness-age-on-reuse
+    title: A response served from storage carries an Age header
+    level: must
+    refs: [RFC9111#4, RFC9111#5.1]
+    requires: [storage-reuse-fresh]
+    responses:
+      fresh:
+        headers:
+          - "Cache-Control: max-age=3600"
+          - "Date: ${now}"
+        body: aging
+    steps:
+      - arrange: true
+      - wait: 1s
+      - expect:
+          forwarded: false
+          headers: ["Age: ~^[0-9]+$"]
+
+  - id: freshness-upstream-age-counts
+    title: Age received from upstream counts against a response's freshness lifetime
+    level: must
+    refs: [RFC9111#4.2.3, RFC9111#4.2.4]
+    responses:
+      already-stale:
+        headers:
+          - "Cache-Control: max-age=60"
+          - "Age: 120"
+          - "Date: ${now}"
+        body: already stale on arrival
+    steps:
+      - arrange: true
+      - expect: {forwarded: true}
+
+  - id: freshness-stale-response-is-revalidated
+    title: A stale stored response is not reused without contacting the origin
+    level: must
+    refs: [RFC9111#4.2.4]
+    responses:
+      short-lived:
+        headers:
+          - "Cache-Control: max-age=1"
+          - "Date: ${now}"
+        body: short lived
+    steps:
+      - arrange: true
+        expect: {forwarded: true}
+      - wait: 2s
+      - expect: {forwarded: true}
+
+  - id: freshness-max-age-overrides-expires
+    title: max-age wins over an Expires field that is further in the future
+    level: must
+    refs: [RFC9111#5.3, RFC9111#5.2.2.1]
+    responses:
+      conflicting:
+        headers:
+          - "Cache-Control: max-age=1"
+          - "Expires: ${now+1h}"
+          - "Date: ${now}"
+        body: max-age wins
+    steps:
+      - arrange: true
+        expect: {forwarded: true}
+      - wait: 2s
+      - expect: {forwarded: true}
+
+  - id: freshness-s-maxage-overrides-max-age
+    title: s-maxage wins over max-age in a shared cache
+    level: must
+    refs: [RFC9111#5.2.2.10]
+    responses:
+      conflicting:
+        headers:
+          - "Cache-Control: max-age=3600, s-maxage=1"
+          - "Date: ${now}"
+        body: s-maxage wins
+    steps:
+      - arrange: true
+        expect: {forwarded: true}
+      - wait: 2s
+      - expect: {forwarded: true}
+
+  - id: freshness-invalid-expires-is-already-stale
+    title: An Expires field that is not a valid HTTP-date means already expired
+    level: must
+    refs: [RFC9111#5.3]
+    responses:
+      zero-expires:
+        headers:
+          - "Expires: 0"
+          - "Date: ${now}"
+          - "Last-Modified: ${now-240h}"
+        body: expired on arrival
+    steps:
+      - arrange: true
+        expect: {forwarded: true}
+      - expect: {forwarded: true}
+
+  - id: freshness-no-heuristic-with-explicit-expiry
+    title: Heuristic freshness is not used when the response has an explicit expiration time
+    level: must
+    refs: [RFC9111#4.2.2]
+    responses:
+      explicitly-stale:
+        headers:
+          - "Expires: ${now-1h}"
+          - "Date: ${now}"
+          - "Last-Modified: ${now-720h}"
+        body: old but explicitly stale
+    steps:
+      - arrange: true
+        expect: {forwarded: true}
+      - expect: {forwarded: true}
+
+  - id: freshness-no-cache-forces-validation
+    title: A response marked no-cache is not reused without validation
+    level: must
+    refs: [RFC9111#5.2.2.4, RFC9111#4]
+    responses:
+      uncached:
+        headers: ["Cache-Control: no-cache, max-age=3600"]
+        body: validate me every time
+    steps:
+      - arrange: true
+        expect: {forwarded: true}
+      - expect: {forwarded: true}
+
+  - id: freshness-must-revalidate-when-stale
+    title: must-revalidate stops a stale response from being served
+    level: must
+    refs: [RFC9111#5.2.2.2, RFC9111#4.2.4]
+    responses:
+      guarded:
+        headers:
+          - "Cache-Control: max-age=1, must-revalidate, stale-while-revalidate=300, stale-if-error=300"
+          - "Date: ${now}"
+        body: never stale
+    steps:
+      - arrange: true
+        expect: {forwarded: true}
+      - wait: 2s
+      - expect: {forwarded: true}
+
+  - id: freshness-proxy-revalidate-when-stale
+    title: proxy-revalidate stops a shared cache from serving a stale response
+    level: must
+    refs: [RFC9111#5.2.2.8, RFC9111#4.2.4]
+    responses:
+      guarded:
+        headers:
+          - "Cache-Control: max-age=1, proxy-revalidate, stale-while-revalidate=300"
+          - "Date: ${now}"
+        body: never stale in a shared cache
+    steps:
+      - arrange: true
+        expect: {forwarded: true}
+      - wait: 2s
+      - expect: {forwarded: true}
+
+  - id: freshness-unrecognized-directive-ignored
+    title: An unrecognized cache directive does not extend a freshness lifetime
+    level: must
+    refs: [RFC9111#5.2.3]
+    responses:
+      extended:
+        headers:
+          - "Cache-Control: max-age=1, mecone-ext=3600"
+          - "Date: ${now}"
+        body: the extension means nothing
+    steps:
+      - arrange: true
+        expect: {forwarded: true}
+      - wait: 2s
+      - expect: {forwarded: true}
+
+  - id: freshness-immutable-expires-with-freshness
+    title: immutable does not keep a response usable once it is stale
+    level: should
+    refs: [RFC8246#2]
+    responses:
+      frozen:
+        headers:
+          - "Cache-Control: max-age=1, immutable"
+          - "Date: ${now}"
+        body: frozen while fresh
+    steps:
+      - arrange: true
+        expect: {forwarded: true}
+      - wait: 2s
+      - expect: {forwarded: true}
+
+  - id: freshness-future-expires-is-reused
+    title: A response with a future Expires time can be reused while fresh
+    level: may
+    refs: [RFC9111#4.2.1, RFC9111#5.3]
+    responses:
+      fresh:
+        headers:
+          - "Date: ${now}"
+          - "Expires: ${now+1h}"
+        body: fresh by expires
+    steps:
+      - arrange: true
+        expect: {forwarded: true}
+      - expect:
+          status: 200
+          body: fresh by expires
+          forwarded: false
+
+  - id: freshness-request-max-age-zero-forces-reuse-check
+    title: A cache can honor request max-age=0 by checking a stored response before reuse
+    level: may
+    refs: [RFC9111#5.2.1.1]
+    responses:
+      fresh:
+        headers: ["Cache-Control: max-age=3600"]
+        body: check before reuse
+    steps:
+      - arrange: true
+        expect: {forwarded: true}
+      - wait: 1s
+      - headers: ["Cache-Control: max-age=0"]
+        expect: {forwarded: true}
+
+  - id: freshness-request-min-fresh-is-honored
+    title: A cache can honor min-fresh when too little freshness remains
+    level: may
+    refs: [RFC9111#5.2.1.3]
+    responses:
+      fresh:
+        headers: ["Cache-Control: max-age=60"]
+        body: not fresh enough
+    steps:
+      - arrange: true
+        expect: {forwarded: true}
+      - headers: ["Cache-Control: min-fresh=3600"]
+        expect: {forwarded: true}

@@ -1,0 +1,132 @@
+group: forwarding
+title: Forwarding messages
+description: Fields and interim responses that a proxy adds, removes or relays.
+refs: [RFC9110#7.6]
+tests:
+  - id: forwarding-drops-connection-options
+    title: Fields named in Connection are not forwarded
+    level: must
+    refs: [RFC9110#7.6.1]
+    protocols: [h1]
+    steps:
+      - headers:
+          - "Connection: X-Mecone-Hop"
+          - "X-Mecone-Hop: 1"
+        expect:
+          forwarded: true
+          forwarded_headers_absent: [X-Mecone-Hop]
+
+  - id: forwarding-adds-via
+    title: A gateway adds Via to the requests it forwards
+    level: must
+    refs: [RFC9110#7.6.3]
+    steps:
+      - expect:
+          forwarded: true
+          forwarded_headers: [Via]
+
+  - id: forwarding-relays-early-hints
+    title: A 103 Early Hints response from the origin is relayed to the client
+    level: must
+    refs: [RFC9110#15.2, RFC8297]
+    responses:
+      hinted:
+        interim:
+          - status: 103
+            headers: ["Link: </style.css>; rel=preload; as=style"]
+        body: final response
+    steps:
+      - expect:
+          interim: [103]
+          status: 200
+          body: final response
+
+  - id: forwarding-relays-trailers
+    title: Trailer fields from the origin reach a client that accepts them
+    level: may
+    refs: [RFC9110#6.5]
+    responses:
+      trailed:
+        trailers: ["Mecone-Checksum: abc123"]
+        body: body with trailers
+    steps:
+      - headers: ["TE: trailers"]
+        expect:
+          body: body with trailers
+          trailers: ["Mecone-Checksum: abc123"]
+
+  - id: forwarding-drops-fields-named-in-connection
+    title: A field named in Connection by its own name is not forwarded
+    level: must
+    refs: [RFC9110#7.6.1]
+    protocols: [h1]
+    steps:
+      - headers:
+          - "Connection: Keep-Alive"
+          - "Keep-Alive: timeout=5"
+        expect:
+          forwarded: true
+          forwarded_headers_absent: [Keep-Alive]
+
+  - id: forwarding-drops-proxy-connection
+    title: Proxy-Connection is removed before the request is forwarded
+    level: should
+    refs: [RFC9110#7.6.1]
+    protocols: [h1]
+    steps:
+      - headers: ["Proxy-Connection: keep-alive"]
+        expect:
+          forwarded: true
+          forwarded_headers_absent: [Proxy-Connection]
+
+  - id: forwarding-keeps-repeated-field-order
+    title: Repeated field lines reach the origin in the order they were sent
+    level: must
+    refs: [RFC9110#5.3]
+    steps:
+      - headers:
+          - "X-Mecone-Order: first"
+          - "X-Mecone-Order: second"
+        expect:
+          forwarded: true
+          forwarded_headers: ["X-Mecone-Order: first, second"]
+
+  - id: forwarding-via-names-the-received-protocol
+    title: The Via the proxy adds starts with the protocol it received the message over
+    level: must
+    refs: [RFC9110#7.6.3]
+    protocols: [h1]
+    requires: [forwarding-adds-via]
+    steps:
+      - expect:
+          forwarded: true
+          forwarded_headers: ['Via: ~^1\.1[ \t]+\S']
+
+  - id: forwarding-adds-via-to-responses
+    title: A proxy adds Via to the responses it forwards
+    level: may
+    refs: [RFC9110#7.6.3]
+    steps:
+      - expect:
+          status: 200
+          headers: [Via]
+
+  - id: forwarding-max-forwards-zero-stops-here
+    title: An OPTIONS request with Max-Forwards 0 is answered by the proxy itself
+    level: must
+    refs: [RFC9110#7.6.2]
+    steps:
+      - method: OPTIONS
+        headers: ["Max-Forwards: 0"]
+        expect: {forwarded: false}
+
+  - id: forwarding-max-forwards-is-decremented
+    title: Max-Forwards is reduced to at most one less on a forwarded OPTIONS request
+    level: must
+    refs: [RFC9110#7.6.2]
+    steps:
+      - method: OPTIONS
+        headers: ["Max-Forwards: 5"]
+        expect:
+          forwarded: true
+          forwarded_headers: ["Max-Forwards: ~^[0-4]$"]

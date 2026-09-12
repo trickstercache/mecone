@@ -1,0 +1,233 @@
+group: storage
+title: Storing responses
+description: Whether the proxy keeps a response for reuse, and when it must not.
+refs: [RFC9111#3]
+tests:
+  - id: storage-no-store
+    title: A response marked no-store is never reused
+    level: must
+    refs: [RFC9111#5.2.2.5]
+    responses:
+      no-store:
+        headers: ["Cache-Control: no-store"]
+        body: never reuse me
+    steps:
+      - arrange: true
+        expect: {forwarded: true}
+      - expect: {forwarded: true}
+
+  - id: storage-private-in-shared-cache
+    title: A shared cache never reuses a response marked private
+    level: must
+    refs: [RFC9111#5.2.2.7]
+    responses:
+      private:
+        headers: ["Cache-Control: private, max-age=3600"]
+        body: for one user only
+    steps:
+      - arrange: true
+        expect: {forwarded: true}
+      - expect: {forwarded: true}
+
+  - id: storage-no-store-on-second-field-line
+    title: no-store is honored when it arrives on its own Cache-Control field line
+    level: must
+    refs: [RFC9110#5.3, RFC9111#5.2.2.5]
+    responses:
+      split-directives:
+        headers:
+          - "Cache-Control: max-age=3600"
+          - "Cache-Control: no-store"
+        body: split across field lines
+    steps:
+      - arrange: true
+        expect: {forwarded: true}
+      - expect: {forwarded: true}
+
+  - id: storage-reuse-fresh
+    title: A fresh response is reused without contacting the origin
+    level: may
+    refs: [RFC9111#4.2]
+    responses:
+      fresh:
+        headers: ["Cache-Control: max-age=3600"]
+        body: reuse me
+    steps:
+      - arrange: true
+        expect: {forwarded: true}
+      - expect:
+          status: 200
+          body: reuse me
+          forwarded: false
+
+  - id: storage-authorized-in-shared-cache
+    title: A shared cache does not reuse a response to an authorized request
+    level: must
+    refs: [RFC9111#3, RFC9111#3.5]
+    responses:
+      authorized:
+        headers: ["Cache-Control: max-age=3600"]
+        body: for the credential holder
+    steps:
+      - arrange: true
+        headers: ["Authorization: Basic bWVjb25lOnRlc3Q="]
+        expect: {forwarded: true}
+      - expect: {forwarded: true}
+
+  - id: storage-authorized-with-public
+    title: public lets a shared cache reuse a response to an authorized request
+    level: may
+    refs: [RFC9111#3.5, RFC9111#5.2.2.9]
+    responses:
+      authorized-public:
+        headers: ["Cache-Control: public, max-age=3600"]
+        body: shareable after authorization
+    steps:
+      - arrange: true
+        headers: ["Authorization: Basic bWVjb25lOnRlc3Q="]
+        expect: {forwarded: true}
+      - expect:
+          status: 200
+          body: shareable after authorization
+          forwarded: false
+
+  - id: storage-uncacheable-status
+    title: A status code that is not heuristically cacheable is not reused without freshness information
+    level: must
+    refs: [RFC9111#3, RFC9111#4.2.2]
+    responses:
+      forbidden:
+        status: 403
+        body: not for you
+    steps:
+      - arrange: true
+        expect: {status: 403, forwarded: true}
+      - expect: {forwarded: true}
+
+  - id: storage-method-in-cache-key
+    title: A stored response to one method is not reused for another
+    level: must
+    refs: [RFC9111#4]
+    responses:
+      cacheable:
+        headers: ["Cache-Control: max-age=3600"]
+        body: stored under one method
+    steps:
+      - arrange: true
+        method: HEAD
+        expect: {forwarded: true}
+      - expect: {forwarded: true}
+
+  - id: storage-target-uri-in-cache-key
+    title: A stored response is not reused for a different target URI
+    level: must
+    refs: [RFC9111#4]
+    responses:
+      cacheable:
+        headers: ["Cache-Control: max-age=3600"]
+        body: stored under one uri
+    steps:
+      - arrange: true
+        path: /one
+        expect: {forwarded: true}
+      - path: /two
+        expect: {forwarded: true}
+
+  - id: storage-writes-through-unsafe-methods
+    title: An unsafe request is always written through to the origin
+    level: must
+    refs: [RFC9111#4, RFC9110#9.2.1]
+    responses:
+      cacheable:
+        headers: ["Cache-Control: max-age=3600"]
+        body: safe to store
+    steps:
+      - arrange: true
+        expect: {forwarded: true}
+      - method: POST
+        body: payload
+        expect: {forwarded: true}
+
+  - id: storage-keeps-unrecognized-fields
+    title: A reused response still carries the unrecognized fields the origin sent
+    level: must
+    refs: [RFC9111#3.1]
+    requires: [storage-reuse-fresh]
+    responses:
+      annotated:
+        headers:
+          - "Cache-Control: max-age=3600"
+          - "X-Mecone-Note: keep-me"
+        body: annotated body
+    steps:
+      - arrange: true
+        expect: {forwarded: true}
+      - expect:
+          forwarded: false
+          headers: ["X-Mecone-Note: keep-me"]
+
+  - id: storage-request-no-store
+    title: A response to a request marked no-store is not reused
+    level: may
+    refs: [RFC9111#5.2.1.5]
+    responses:
+      cacheable:
+        headers: ["Cache-Control: max-age=3600"]
+        body: requested with no-store
+    steps:
+      - arrange: true
+        headers: ["Cache-Control: no-store"]
+        expect: {forwarded: true}
+      - expect: {forwarded: true}
+
+  - id: storage-authorized-with-s-maxage
+    title: s-maxage permits a shared cache to reuse a response to an authorized request
+    level: may
+    refs: [RFC9111#3.5, RFC9111#5.2.2.10]
+    responses:
+      authorized:
+        headers: ["Cache-Control: s-maxage=3600"]
+        body: shared with s-maxage
+    steps:
+      - arrange: true
+        headers: ["Authorization: Basic bWVjb25lOnRlc3Q="]
+        expect: {forwarded: true}
+      - expect:
+          status: 200
+          body: shared with s-maxage
+          forwarded: false
+
+  - id: storage-explicitly-fresh-404
+    title: An explicitly fresh 404 response can be reused
+    level: may
+    refs: [RFC9111#3, RFC9111#4.2.2, RFC9110#15.5.5]
+    responses:
+      missing:
+        status: 404
+        headers: ["Cache-Control: max-age=3600"]
+        body: still missing
+    steps:
+      - arrange: true
+        expect: {status: 404, forwarded: true}
+      - expect:
+          status: 404
+          body: still missing
+          forwarded: false
+
+  - id: storage-explicitly-fresh-301
+    title: An explicitly fresh 301 response can be reused
+    level: may
+    refs: [RFC9111#3, RFC9111#4.2.2, RFC9110#15.4.2]
+    responses:
+      moved:
+        status: 301
+        headers:
+          - "Cache-Control: max-age=3600"
+          - "Location: /new-place"
+    steps:
+      - arrange: true
+        expect: {status: 301, forwarded: true}
+      - expect:
+          status: 301
+          headers: ["Location: /new-place"]
+          forwarded: false

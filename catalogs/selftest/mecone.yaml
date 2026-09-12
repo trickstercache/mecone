@@ -1,0 +1,26 @@
+# Mecone against itself. The one target is an unmanaged proxy whose URL is the origin Mecone
+# starts for it, so the client's "proxy" is the origin: every request goes straight there.
+#
+# Nothing here measures a proxy. It exercises the harness end to end -- the suites load, the
+# scripts upload, the origin answers as written, and the checker judges what came back -- and it
+# pins what the suites do with no intermediary at all. Tests of proxy behavior are expected to
+# fail: with no proxy in the path, nothing adds Via or strips a hop-by-hop field, and nothing
+# caches, so the tests that require a cache are skipped.
+
+notice: >-
+  Skipped and failed tests here are the absence of a proxy hop, not defects in Mecone: with
+  nothing between the client and the origin, no Via is added, no hop-by-hop field is removed,
+  and nothing is cached.
+
+run:
+  protocols: [h1]
+  concurrency: 8
+  timeout: 30s
+
+targets:
+  # the origin binds this port and the client is pointed at the same one; an unmanaged target
+  # cannot learn a port that changes every run
+  - name: origin
+    proxy:
+      url: http://127.0.0.1:8000
+      origin_port: 8000

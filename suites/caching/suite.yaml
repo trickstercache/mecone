@@ -1,0 +1,5 @@
+id: caching
+title: HTTP Caching
+description: >-
+  How a shared cache stores, reuses, validates and invalidates responses, per RFC 9111 and the
+  cache directives added by RFC 5861 and RFC 8246.

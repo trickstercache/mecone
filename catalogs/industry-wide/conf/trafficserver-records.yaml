@@ -1,0 +1,8 @@
+# Apache Traffic Server as a reverse proxy cache. Everything not named here keeps the shipped
+# default, including the cache's own heuristics and its 256M on-disk store.
+records:
+  http:
+    server_ports: ${LISTEN_PORT}
+  url_remap:
+    # forward the client's Host rather than the remapped origin's
+    pristine_host_hdr: 1

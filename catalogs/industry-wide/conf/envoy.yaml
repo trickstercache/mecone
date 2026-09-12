@@ -1,0 +1,56 @@
+# Envoy reverse proxy with the HTTP cache filter (SimpleHttpCache) in front of the Mecone origin.
+
+static_resources:
+  listeners:
+    - name: mecone
+      address:
+        socket_address:
+          address: 0.0.0.0
+          port_value: ${LISTEN_PORT}
+      filter_chains:
+        - filters:
+            - name: envoy.filters.network.http_connection_manager
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+                stat_prefix: mecone
+                route_config:
+                  name: all
+                  virtual_hosts:
+                    - name: all
+                      domains: ["*"]
+                      routes:
+                        - match:
+                            prefix: "/"
+                          route:
+                            cluster: origin
+                            timeout: 30s
+                http_filters:
+                  - name: envoy.filters.http.cache
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.cache.v3.CacheConfig
+                      typed_config:
+                        "@type": type.googleapis.com/envoy.extensions.http.cache.simple_http_cache.v3.SimpleHttpCacheConfig
+                  - name: envoy.filters.http.router
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+
+  clusters:
+    - name: origin
+      type: STRICT_DNS
+      connect_timeout: 5s
+      # the origin listens on IPv4, and the container's host alias also resolves to IPv6;
+      # getaddrinfo reads /etc/hosts, which the c-ares default resolver does not
+      dns_lookup_family: V4_ONLY
+      typed_dns_resolver_config:
+        name: envoy.network.dns_resolver.getaddrinfo
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig
+      load_assignment:
+        cluster_name: origin
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: ${ORIGIN_HOST}
+                      port_value: ${ORIGIN_PORT}

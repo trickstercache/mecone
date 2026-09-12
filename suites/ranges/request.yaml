@@ -1,0 +1,121 @@
+group: request
+title: Handling a range request
+description: How a range request is answered, including when a precondition rules the range out.
+refs: [RFC9110#14.2]
+tests:
+  - id: request-unknown-range-unit-is-ignored
+    title: A Range field in a unit the server does not understand is ignored
+    level: must
+    refs: [RFC9110#14.2]
+    responses:
+      alphabet:
+        headers: ["Cache-Control: max-age=3600"]
+        body: 0123456789abcdefghij
+        ranges: true
+    steps:
+      - headers: ["Range: mecone-parts=1-2"]
+        expect:
+          status: 200
+          body: 0123456789abcdefghij
+
+  - id: request-range-is-ignored-on-head
+    title: A Range field is ignored on a HEAD request
+    level: must
+    refs: [RFC9110#14.2]
+    responses:
+      alphabet:
+        headers: ["Cache-Control: max-age=3600"]
+        body: 0123456789abcdefghij
+        ranges: true
+    steps:
+      - method: HEAD
+        headers: ["Range: bytes=0-4"]
+        expect:
+          status: 200
+          headers_absent: [Content-Range]
+
+  - id: request-conditional-outranks-range
+    title: A matching If-None-Match gives 304 rather than partial content
+    level: must
+    refs: [RFC9110#13.2.2, RFC9110#14.2]
+    responses:
+      alphabet:
+        headers:
+          - "Cache-Control: max-age=3600"
+          - 'ETag: "b1"'
+        body: 0123456789abcdefghij
+        ranges: true
+    steps:
+      - arrange: true
+        expect: {forwarded: true}
+      - headers:
+          - 'If-None-Match: "b1"'
+          - "Range: bytes=0-4"
+        expect:
+          status: 304
+          body: ""
+
+  - id: request-stale-if-range-gets-the-whole-response
+    title: A Range with an If-Range that no longer matches gets the whole response
+    level: must
+    refs: [RFC9110#13.1.5, RFC9110#13.2.2]
+    responses:
+      alphabet:
+        headers:
+          - "Cache-Control: max-age=3600"
+          - 'ETag: "b2"'
+        body: 0123456789abcdefghij
+        ranges: true
+    steps:
+      - arrange: true
+        expect: {forwarded: true}
+      - headers:
+          - "Range: bytes=0-4"
+          - 'If-Range: "no-longer-current"'
+        expect:
+          status: 200
+          body: 0123456789abcdefghij
+
+  - id: request-matching-if-range-gets-partial-content
+    title: A Range with a matching If-Range gets partial content
+    level: may
+    refs: [RFC9110#13.1.5, RFC9110#14.2]
+    responses:
+      alphabet:
+        headers:
+          - "Cache-Control: max-age=3600"
+          - 'ETag: "b3"'
+        body: 0123456789abcdefghij
+        ranges: true
+    steps:
+      - arrange: true
+        expect: {forwarded: true}
+      - headers:
+          - "Range: bytes=0-4"
+          - 'If-Range: "b3"'
+        expect:
+          status: 206
+          headers: ["Content-Range: bytes 0-4/20"]
+          body: "01234"
+
+  - id: request-partial-content-carries-representation-fields
+    title: A 206 carries the validator and cache directives a 200 would have carried
+    level: must
+    refs: [RFC9110#15.3.7, RFC9110#15.3.7.1]
+    responses:
+      alphabet:
+        headers:
+          - "Cache-Control: max-age=3600"
+          - 'ETag: "b4"'
+        body: 0123456789abcdefghij
+        ranges: true
+    steps:
+      - headers: ["Range: bytes=15-19"]
+        expect:
+          status: 206
+          headers:
+            - "Content-Range: bytes 15-19/20"
+            - 'ETag: "b4"'
+            - "Cache-Control: max-age=3600"
+            - Date
+          body: fghij

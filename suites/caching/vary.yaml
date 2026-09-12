@@ -1,0 +1,120 @@
+group: vary
+title: Secondary cache keys
+description: Which stored response, if any, may answer a request when Vary is in play.
+refs: [RFC9111#4.1]
+tests:
+  - id: vary-mismatched-field-is-not-reused
+    title: A stored response is not reused when a field named in Vary differs
+    level: must
+    refs: [RFC9111#4.1, RFC9110#12.5.5]
+    responses:
+      varied:
+        headers:
+          - "Cache-Control: max-age=3600"
+          - "Vary: X-Mecone-Select"
+        body: selected by a header
+    steps:
+      - arrange: true
+        headers: ["X-Mecone-Select: alpha"]
+        expect: {forwarded: true}
+      - headers: ["X-Mecone-Select: beta"]
+        expect: {forwarded: true}
+
+  - id: vary-absent-field-does-not-match
+    title: A field named in Vary that is absent does not match a request that sent it
+    level: must
+    refs: [RFC9111#4.1]
+    responses:
+      varied:
+        headers:
+          - "Cache-Control: max-age=3600"
+          - "Vary: X-Mecone-Select"
+        body: selected by a header
+    steps:
+      - arrange: true
+        headers: ["X-Mecone-Select: alpha"]
+        expect: {forwarded: true}
+      - expect: {forwarded: true}
+
+  - id: vary-asterisk-never-matches
+    title: A stored response with Vary "*" is never reused
+    level: must
+    refs: [RFC9111#4.1]
+    responses:
+      unmatchable:
+        headers:
+          - "Cache-Control: max-age=3600"
+          - "Vary: *"
+        body: never a match
+    steps:
+      - arrange: true
+        expect: {forwarded: true}
+      - expect: {forwarded: true}
+
+  - id: vary-matching-fields-are-reused
+    title: A stored response is reused when every field named in Vary matches
+    level: may
+    refs: [RFC9111#4.1]
+    requires: [storage-reuse-fresh]
+    responses:
+      varied:
+        headers:
+          - "Cache-Control: max-age=3600"
+          - "Vary: X-Mecone-Select"
+        body: selected by a header
+    steps:
+      - arrange: true
+        headers: ["X-Mecone-Select: alpha"]
+        expect: {forwarded: true}
+      - headers: ["X-Mecone-Select: alpha"]
+        expect:
+          status: 200
+          body: selected by a header
+          forwarded: false
+
+  - id: vary-repeated-lines-nominate-every-field
+    title: Every field named across repeated Vary lines participates in selection
+    level: must
+    refs: [RFC9111#4.1, RFC9110#5.3, RFC9110#12.5.5]
+    responses:
+      varied:
+        headers:
+          - "Cache-Control: max-age=3600"
+          - "Vary: X-Mecone-Color"
+          - "Vary: X-Mecone-Shape"
+        body: selected twice
+    steps:
+      - arrange: true
+        headers:
+          - "X-Mecone-Color: blue"
+          - "X-Mecone-Shape: round"
+        expect: {forwarded: true}
+      - headers:
+          - "X-Mecone-Color: blue"
+          - "X-Mecone-Shape: square"
+        expect: {forwarded: true}
+
+  - id: vary-multiple-matching-fields-are-reused
+    title: A stored response can be reused when multiple nominated fields all match
+    level: may
+    refs: [RFC9111#4.1, RFC9110#12.5.5]
+    requires: [storage-reuse-fresh]
+    responses:
+      varied:
+        headers:
+          - "Cache-Control: max-age=3600"
+          - "Vary: X-Mecone-Color, X-Mecone-Shape"
+        body: both fields match
+    steps:
+      - arrange: true
+        headers:
+          - "X-Mecone-Color: blue"
+          - "X-Mecone-Shape: round"
+        expect: {forwarded: true}
+      - headers:
+          - "X-Mecone-Color: blue"
+          - "X-Mecone-Shape: round"
+        expect:
+          status: 200
+          body: both fields match
+          forwarded: false

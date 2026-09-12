@@ -1,0 +1,51 @@
+group: directives
+title: Cache-Control handling
+description: Relaying cache directives and honoring the ones a client sends.
+refs: [RFC9111#5.2]
+tests:
+  - id: directives-relayed-on-requests
+    title: An extension cache directive on a request is passed through to the origin
+    level: must
+    refs: [RFC9111#5.2]
+    steps:
+      - headers: ["Cache-Control: mecone-ext=1"]
+        expect:
+          forwarded: true
+          forwarded_headers: ["Cache-Control: ~mecone-ext=1"]
+
+  - id: directives-relayed-on-responses
+    title: An extension cache directive on a response is passed through to the client
+    level: must
+    refs: [RFC9111#5.2]
+    responses:
+      directed:
+        headers: ["Cache-Control: no-store, mecone-ext=1"]
+        body: directives ride along
+    steps:
+      - expect:
+          status: 200
+          headers: ["Cache-Control: ~mecone-ext=1"]
+
+  - id: directives-request-no-cache-forces-validation
+    title: A request marked no-cache is not answered from storage
+    level: may
+    refs: [RFC9111#5.2.1.4]
+    responses:
+      fresh:
+        headers: ["Cache-Control: max-age=3600"]
+        body: stored but revalidated
+    steps:
+      - arrange: true
+        expect: {forwarded: true}
+      - headers: ["Cache-Control: no-cache"]
+        expect: {forwarded: true}
+
+  - id: directives-request-only-if-cached
+    title: only-if-cached gets a 504 when nothing is stored for the request
+    level: may
+    refs: [RFC9111#5.2.1.7]
+    steps:
+      - headers: ["Cache-Control: only-if-cached"]
+        expect:
+          status: 504
+          forwarded: false

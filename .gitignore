@@ -1,0 +1,15 @@
+.claude
+AGENTS.md
+
+bin/*
+docs/todos/*
+
+.coverprofile
+results*.json
+results*.csv
+**/reports/**/*.json
+**/reports/**/*.yaml
+**/reports/**/*.csv
+**/reports/**/*.md
+
+.DS_Store

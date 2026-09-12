@@ -1,0 +1,16 @@
+# Traefik dynamic configuration: one router matching every path, forwarding to the Mecone origin.
+
+http:
+  routers:
+    mecone:
+      rule: "PathPrefix(`/`)"
+      entryPoints:
+        - web
+      service: origin
+
+  services:
+    origin:
+      loadBalancer:
+        passHostHeader: true
+        servers:
+          - url: "${ORIGIN_URL}"

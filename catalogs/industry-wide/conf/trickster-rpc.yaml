@@ -1,0 +1,19 @@
+# Trickster as an HTTP reverse proxy cache in front of the Mecone origin.
+# The reverseproxycache provider is Trickster's general-purpose HTTP cache.
+
+listeners:
+  # "default" is the built-in listener backends bind to; any other name is ignored
+  default:
+    protocol: http
+    address: ""
+    port: ${LISTEN_PORT}
+
+backends:
+  default:
+    origin_url: ${ORIGIN_URL}
+    provider: reverseproxycache
+    is_default: true
+
+logging:
+  # no log_file means logs go to stdout
+  log_level: info

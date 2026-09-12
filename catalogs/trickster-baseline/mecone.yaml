@@ -1,0 +1,74 @@
+# Trickster measured against itself: the newest release, and whatever is running on this machine.
+# Use it to see what a local change does to Trickster's HTTP compliance before it ships.
+#
+# trickster-localdev is not started or configured by Mecone, so set it up yourself first:
+#
+#   1. Give your local Trickster a backend named mecone1 with provider reverseproxycache, whose
+#      origin_url is http://127.0.0.1:8489 -- the port this catalog pins for that target's origin.
+#   2. Have it listen on port 8480, so its mecone1 backend answers at http://localhost:8480/mecone1.
+#   3. Start it, then run `make trickster-baseline-test`.
+#
+# conf/trickster.yaml is the same configuration, and is what trickster-latest runs.
+
+run:
+  protocols: [h1]
+  concurrency: 8
+  timeout: 30s
+
+targets:
+  # latest points to the latest 2.x release, rpc = configured as reverse proxy cache
+  - name: trickster-latest-rpc
+    docker:
+      image: ghcr.io/trickstercache/trickster
+      tag: "2"
+      pull: missing
+      args: ["-config", "/etc/trickster/trickster.yaml"]
+      files:
+        - source: conf/trickster-rpc.yaml
+          target: /etc/trickster/trickster.yaml
+
+  # the `main` tag is synced to the latest commit on the base (remote) repo
+  - name: trickster-main-rpc
+    docker:
+      image: ghcr.io/trickstercache/trickster
+      tag: "main"
+      pull: missing
+      args: ["-config", "/etc/trickster/trickster.yaml"]
+      files:
+        - source: conf/trickster-rpc.yaml
+          target: /etc/trickster/trickster.yaml
+
+  # Trickster already running on this machine (reverse proxy cache), requires origin port
+  - name: trickster-localdev-rpc
+    proxy:
+      url: http://localhost:8480/mecone-rpc
+      origin_port: 8488
+
+
+  # latest points to the latest 2.x release, rp = configured as reverse proxy (no cache)
+  - name: trickster-latest-rp
+    docker:
+      image: ghcr.io/trickstercache/trickster
+      tag: "2"
+      pull: missing
+      args: ["-config", "/etc/trickster/trickster.yaml"]
+      files:
+        - source: conf/trickster-rp.yaml
+          target: /etc/trickster/trickster.yaml
+
+  - name: trickster-main-rp
+    docker:
+      image: ghcr.io/trickstercache/trickster
+      tag: "main"
+      pull: missing
+      args: ["-config", "/etc/trickster/trickster.yaml"]
+      files:
+        - source: conf/trickster-rp.yaml
+          target: /etc/trickster/trickster.yaml
+
+  # Trickster already running on this machine (reverse proxy), requires origin port
+  - name: trickster-localdev-rp
+    proxy:
+      url: http://localhost:8480/mecone-rp
+      origin_port: 8487
+

@@ -1,0 +1,5 @@
+id: ranges
+title: Range Requests
+description: >-
+  Byte-range requests and partial responses, per RFC 9110 section 14, including ranges served
+  from stored responses.

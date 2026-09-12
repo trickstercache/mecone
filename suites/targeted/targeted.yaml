@@ -1,0 +1,145 @@
+group: targeted
+title: Targeted cache-control fields
+description: What a targeted cache-control field does to the cache it names, and to every other cache.
+refs: [RFC9213#2.2]
+tests:
+  - id: targeted-unknown-field-is-relayed
+    title: A targeted field a cache does not use is passed through to the client
+    level: must
+    refs: [RFC9213#2.2]
+    responses:
+      targeted:
+        headers:
+          - "Cache-Control: max-age=3600"
+          - "X-Mecone-Cache-Control: no-store"
+        body: targeted at nobody
+    steps:
+      - expect:
+          status: 200
+          headers: ["X-Mecone-Cache-Control: no-store"]
+
+  - id: targeted-unknown-field-changes-nothing
+    title: A targeted field a cache does not use does not change how it caches
+    level: must
+    refs: [RFC9213#2.2]
+    requires: [storage-reuse-fresh]
+    responses:
+      targeted:
+        headers:
+          - "Cache-Control: max-age=3600"
+          - "X-Mecone-Cache-Control: no-store"
+        body: targeted at nobody
+    steps:
+      - arrange: true
+        expect: {forwarded: true}
+      - expect:
+          status: 200
+          body: targeted at nobody
+          forwarded: false
+
+  - id: targeted-cdn-cache-control-is-used
+    title: A CDN cache takes its caching policy from CDN-Cache-Control
+    level: may
+    refs: [RFC9213#2.2, RFC9213#3]
+    responses:
+      cdn-only:
+        headers:
+          - "Cache-Control: no-store"
+          - "CDN-Cache-Control: max-age=3600"
+        body: stored by the cdn alone
+    steps:
+      - arrange: true
+        expect: {forwarded: true}
+      - expect:
+          status: 200
+          body: stored by the cdn alone
+          forwarded: false
+
+  - id: targeted-cdn-cache-control-wins
+    title: A CDN cache ignores Cache-Control when CDN-Cache-Control is present
+    level: must
+    refs: [RFC9213#2.2]
+    requires: [targeted-cdn-cache-control-is-used]
+    responses:
+      cdn-no-store:
+        headers:
+          - "Cache-Control: max-age=3600"
+          - "CDN-Cache-Control: no-store"
+        body: not for the cdn to keep
+    steps:
+      - arrange: true
+        expect: {forwarded: true}
+      - expect: {forwarded: true}
+
+  - id: targeted-empty-field-falls-back
+    title: An empty targeted field is ignored in favor of Cache-Control
+    level: must
+    refs: [RFC9213#2.1]
+    requires: [storage-reuse-fresh]
+    responses:
+      empty-target:
+        headers:
+          - "Cache-Control: max-age=3600"
+          - "CDN-Cache-Control: "
+        body: cache-control still applies
+    steps:
+      - arrange: true
+        expect: {forwarded: true}
+      - expect:
+          status: 200
+          body: cache-control still applies
+          forwarded: false
+
+  - id: targeted-no-cache-overrides-max-age
+    title: no-cache in a targeted field prevents reuse without validation
+    level: must
+    refs: [RFC9213#2.2]
+    requires: [targeted-cdn-cache-control-is-used]
+    responses:
+      validate:
+        headers:
+          - "Cache-Control: max-age=3600"
+          - "CDN-Cache-Control: max-age=3600, no-cache"
+        body: validate targeted response
+    steps:
+      - arrange: true
+        expect: {forwarded: true}
+      - expect: {forwarded: true}
+
+  - id: targeted-unrecognized-directive-is-ignored
+    title: An unrecognized targeted directive does not override a recognized max-age
+    level: must
+    refs: [RFC9213#2.2]
+    requires: [targeted-cdn-cache-control-is-used]
+    responses:
+      extended:
+        headers:
+          - "Cache-Control: no-store"
+          - "CDN-Cache-Control: max-age=3600, mecone-ext=1"
+        body: known targeted directive applies
+    steps:
+      - arrange: true
+        expect: {forwarded: true}
+      - expect:
+          status: 200
+          body: known targeted directive applies
+          forwarded: false
+
+  - id: targeted-malformed-field-falls-back
+    title: A malformed targeted field is ignored in favor of Cache-Control
+    level: must
+    refs: [RFC9213#2.1, RFC9213#2.2]
+    requires: [storage-reuse-fresh, targeted-cdn-cache-control-is-used]
+    responses:
+      malformed:
+        headers:
+          - "Cache-Control: max-age=3600"
+          - 'CDN-Cache-Control: max-age="'
+        body: malformed target ignored
+    steps:
+      - arrange: true
+        expect: {forwarded: true}
+      - expect:
+          status: 200
+          body: malformed target ignored
+          forwarded: false

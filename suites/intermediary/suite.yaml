@@ -1,0 +1,4 @@
+id: intermediary
+title: Intermediary Message Handling
+description: >-
+  What a proxy or gateway must do to the messages it forwards, per RFC 9110 sections 7.6 and 15.2.

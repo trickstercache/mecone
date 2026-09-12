@@ -1,0 +1,5 @@
+id: cache-status
+title: Cache-Status Reporting
+description: >-
+  How a cache describes its own handling of a request in the Cache-Status response header field,
+  per RFC 9211.

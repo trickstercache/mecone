@@ -1,0 +1,214 @@
+group: validation
+title: Validation
+description: Conditional requests between client, cache and origin.
+refs: [RFC9111#4.3]
+tests:
+  - id: validation-answers-matching-if-none-match
+    title: A fresh stored response answers a matching If-None-Match with 304
+    level: should
+    refs: [RFC9111#4.3.2, RFC9110#13.1.2]
+    requires: [storage-reuse-fresh]
+    responses:
+      tagged:
+        headers:
+          - "Cache-Control: max-age=3600"
+          - 'ETag: "m1"'
+        body: tagged body
+    steps:
+      - arrange: true
+      - headers: ['If-None-Match: "m1"']
+        expect:
+          status: 304
+          forwarded: false
+
+  - id: validation-revalidates-stale-with-etag
+    title: A stale response with an ETag is revalidated with If-None-Match
+    level: may
+    refs: [RFC9111#4.3.1]
+    responses:
+      short-lived:
+        headers:
+          - "Cache-Control: max-age=1"
+          - 'ETag: "m2"'
+        body: revalidate me
+    steps:
+      - arrange: true
+      - wait: 2s
+      - expect:
+          status: 200
+          body: revalidate me
+          forwarded: true
+          forwarded_headers: ['If-None-Match: "m2"']
+
+  - id: validation-uses-a-full-validation-response
+    title: A full response to a validation request is the one the client receives
+    level: must
+    refs: [RFC9111#4.3.3]
+    responses:
+      old:
+        headers:
+          - "Cache-Control: max-age=1"
+          - 'ETag: "m3"'
+          - "Date: ${now}"
+        body: the old body
+      replacement:
+        headers:
+          - "Cache-Control: max-age=3600"
+          - 'ETag: "m4"'
+        body: the new body
+        ignore_conditionals: true
+    steps:
+      - arrange: true
+        respond_with: old
+        expect: {forwarded: true}
+      - wait: 2s
+      - respond_with: replacement
+        expect:
+          status: 200
+          body: the new body
+
+  - id: validation-304-freshens-the-stored-response
+    title: A 304 updates the stored response's freshness
+    level: must
+    refs: [RFC9111#4.3.4, RFC9111#3.2]
+    requires: [storage-reuse-fresh, validation-revalidates-stale-with-etag]
+    responses:
+      short-lived:
+        headers:
+          - "Cache-Control: max-age=1"
+          - 'ETag: "m5"'
+          - "Date: ${now}"
+        body: freshen me
+      renewed:
+        headers:
+          - "Cache-Control: max-age=3600"
+          - 'ETag: "m5"'
+        body: freshen me
+    steps:
+      - arrange: true
+        respond_with: short-lived
+        expect: {forwarded: true}
+      - wait: 2s
+      - arrange: true
+        respond_with: renewed
+        expect:
+          status: 200
+          body: freshen me
+          forwarded: true
+      - respond_with: renewed
+        expect:
+          status: 200
+          body: freshen me
+          forwarded: false
+
+  - id: validation-304-carries-the-entity-tag
+    title: A 304 generated from storage carries its validator and cache directives
+    level: must
+    refs: [RFC9110#15.4.5]
+    requires: [validation-answers-matching-if-none-match]
+    responses:
+      tagged:
+        headers:
+          - "Cache-Control: max-age=3600"
+          - 'ETag: "m6"'
+        body: tagged body
+    steps:
+      - arrange: true
+        expect: {forwarded: true}
+      - headers: ['If-None-Match: "m6"']
+        expect:
+          status: 304
+          body: ""
+          headers: ['ETag: "m6"', Date, "Cache-Control: max-age=3600"]
+          forwarded: false
+
+  - id: validation-if-none-match-beats-if-modified-since
+    title: If-Modified-Since is ignored when the request also carries If-None-Match
+    level: must
+    refs: [RFC9110#13.1.3, RFC9110#13.2.2, RFC9111#4.3.2]
+    responses:
+      dated:
+        headers:
+          - "Cache-Control: max-age=3600"
+          - 'ETag: "m7"'
+          - "Last-Modified: ${now-1h}"
+        body: dated body
+    steps:
+      - arrange: true
+        expect: {forwarded: true}
+      - headers:
+          - 'If-None-Match: "no-such-tag"'
+          - "If-Modified-Since: ${now}"
+        expect:
+          status: 200
+          body: dated body
+
+  - id: validation-answers-matching-if-modified-since
+    title: A fresh stored response can answer a matching If-Modified-Since with 304
+    level: may
+    refs: [RFC9111#4.3.2, RFC9110#13.1.3]
+    requires: [storage-reuse-fresh]
+    responses:
+      dated:
+        headers:
+          - "Cache-Control: max-age=3600"
+          - "Last-Modified: ${now-1h}"
+        body: dated body
+    steps:
+      - arrange: true
+      - headers: ["If-Modified-Since: ${now}"]
+        expect:
+          status: 304
+          body: ""
+          forwarded: false
+
+  - id: validation-if-none-match-uses-weak-comparison
+    title: If-None-Match uses weak comparison for a GET request
+    level: should
+    refs: [RFC9110#13.1.2]
+    responses:
+      tagged:
+        headers:
+          - "Cache-Control: max-age=3600"
+          - 'ETag: W/"weak-1"'
+        body: weakly tagged
+    steps:
+      - headers: ['If-None-Match: "weak-1"']
+        expect:
+          status: 304
+          body: ""
+
+  - id: validation-if-none-match-checks-every-tag
+    title: If-None-Match succeeds when any listed entity tag matches
+    level: should
+    refs: [RFC9110#13.1.2]
+    responses:
+      tagged:
+        headers:
+          - "Cache-Control: max-age=3600"
+          - 'ETag: "listed-2"'
+        body: listed tag
+    steps:
+      - headers: ['If-None-Match: "listed-1", "listed-2", "listed-3"']
+        expect:
+          status: 304
+          body: ""
+
+  - id: validation-revalidates-stale-with-last-modified
+    title: A stale response with Last-Modified can be revalidated with If-Modified-Since
+    level: may
+    refs: [RFC9111#4.3.1, RFC9110#13.1.3]
+    responses:
+      dated:
+        headers:
+          - "Cache-Control: max-age=1"
+          - "Last-Modified: ${now-1h}"
+        body: revalidate by date
+    steps:
+      - arrange: true
+      - wait: 2s
+      - expect:
+          status: 200
+          body: revalidate by date
+          forwarded: true
+          forwarded_headers: ["If-Modified-Since"]

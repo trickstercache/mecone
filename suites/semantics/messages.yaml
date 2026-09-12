@@ -1,0 +1,85 @@
+group: messages
+title: Message semantics and content
+description: Whether an intermediary preserves valid messages and their semantic constraints.
+refs: [RFC9110#6]
+tests:
+  - id: messages-head-has-no-content
+    title: A response to HEAD has no message content
+    level: must
+    refs: [RFC9110#9.3.2, RFC9112#6.3]
+    responses:
+      described:
+        body: this content is not sent
+    steps:
+      - method: HEAD
+        expect:
+          status: 200
+          body: ""
+
+  - id: messages-204-has-no-content
+    title: A 204 response has no message content
+    level: must
+    refs: [RFC9110#15.3.5, RFC9112#6.3]
+    responses:
+      empty:
+        status: 204
+    steps:
+      - expect:
+          status: 204
+          body: ""
+
+  - id: messages-unknown-status-is-forwarded
+    title: An unrecognized status code is forwarded without changing its code
+    level: must
+    refs: [RFC9110#15.1]
+    responses:
+      extension:
+        status: 599
+        body: extension status
+    steps:
+      - expect:
+          status: 599
+          body: extension status
+          forwarded: true
+
+  - id: messages-h1-content-is-complete
+    title: HTTP/1.1 response content is forwarded completely
+    level: must
+    refs: [RFC9112#6, RFC9112#6.3]
+    protocols: [h1]
+    responses:
+      content:
+        body: 0123456789abcdefghijklmnopqrstuvwxyz0123456789abcdefghijklmnopqrstuvwxyz
+    steps:
+      - expect:
+          status: 200
+          body: 0123456789abcdefghijklmnopqrstuvwxyz0123456789abcdefghijklmnopqrstuvwxyz
+
+  - id: messages-h2-content-is-complete
+    title: HTTP/2 response content is forwarded completely
+    level: must
+    refs: [RFC9113#8.1]
+    protocols: [h2, h2c]
+    responses:
+      content:
+        body: 0123456789abcdefghijklmnopqrstuvwxyz0123456789abcdefghijklmnopqrstuvwxyz
+    steps:
+      - expect:
+          status: 200
+          body: 0123456789abcdefghijklmnopqrstuvwxyz0123456789abcdefghijklmnopqrstuvwxyz
+
+  - id: messages-h2-trailers-are-received
+    title: HTTP/2 response trailers are carried after the content
+    level: may
+    refs: [RFC9110#6.5, RFC9113#8.1]
+    protocols: [h2, h2c]
+    responses:
+      trailed:
+        body: h2 content before trailers
+        trailers: ["Mecone-Checksum: h2-complete"]
+    steps:
+      - headers: ["TE: trailers"]
+        expect:
+          status: 200
+          body: h2 content before trailers
+          trailers: ["Mecone-Checksum: h2-complete"]

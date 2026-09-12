@@ -1,0 +1,106 @@
+# Catalog of widely deployed reverse proxies, each started in docker, tested, then stopped.
+# Every proxy is configured to forward all paths to its own Mecone origin, with its own HTTP cache
+# enabled where the open-source build has one. The goal is an honest measurement of each proxy as
+# configured, not a ranking.
+
+run:
+  protocols: [h1]
+  concurrency: 8
+  timeout: 30s
+
+targets:
+  # nginx stable branch on alpine; 1.30.x is the current stable series, 1.31.x is mainline
+  - name: nginx
+    docker:
+      image: nginx
+      tag: "1.30.4-alpine"
+      pull: missing
+      files:
+        - source: conf/nginx.conf
+          target: /etc/nginx/nginx.conf
+
+  # HAProxy 3.4 is the branch the image tags as lts; alpine keeps the image small
+  - name: haproxy
+    docker:
+      image: haproxy
+      tag: "3.4.4-alpine"
+      pull: missing
+      files:
+        - source: conf/haproxy.cfg
+          target: /usr/local/etc/haproxy/haproxy.cfg
+
+  # newest Traefik v3 release; v3 is the current major line
+  - name: traefik
+    docker:
+      image: traefik
+      tag: "v3.7.13"
+      pull: missing
+      files:
+        - source: conf/traefik.yaml
+          target: /etc/traefik/traefik.yaml
+        - source: conf/traefik-dynamic.yaml
+          target: /etc/traefik/dynamic.yaml
+
+  # newest tagged Envoy release; the -latest suffix tracks a minor, so the patch is pinned instead
+  - name: envoy
+    docker:
+      image: envoyproxy/envoy
+      tag: "v1.39.1"
+      pull: missing
+      files:
+        - source: conf/envoy.yaml
+          target: /etc/envoy/envoy.yaml
+
+  # newest Varnish release; the official image takes its listen port from the environment
+  - name: varnish
+    docker:
+      image: varnish
+      tag: "9.0.3"
+      pull: missing
+      env: ["VARNISH_HTTP_PORT=${LISTEN_PORT}"]
+      files:
+        - source: conf/varnish.vcl
+          target: /etc/varnish/default.vcl
+
+  # Canonical's squid image; the tag names squid's version and the Ubuntu release it sits on
+  - name: squid
+    docker:
+      image: ubuntu/squid
+      tag: "6.6-24.04_edge"
+      pull: missing
+      files:
+        - source: conf/squid.conf
+          target: /etc/squid/squid.conf
+
+  # newest Apache Traffic Server release, from the project's own image
+  - name: trafficserver
+    docker:
+      image: trafficserver/trafficserver
+      tag: "10.2.0"
+      pull: missing
+      files:
+        - source: conf/trafficserver-records.yaml
+          target: /opt/etc/trafficserver/records.yaml
+        - source: conf/trafficserver-remap.config
+          target: /opt/etc/trafficserver/remap.config
+
+  # newest Trickster 2.0 patch release
+  - name: trickster-rp
+    docker:
+      image: ghcr.io/trickstercache/trickster
+      tag: "2"
+      pull: missing
+      args: ["-config", "/etc/trickster/trickster.yaml"]
+      files:
+        - source: conf/trickster-rp.yaml
+          target: /etc/trickster/trickster.yaml
+
+  - name: trickster-rpc
+    docker:
+      image: ghcr.io/trickstercache/trickster
+      tag: "2"
+      pull: missing
+      args: ["-config", "/etc/trickster/trickster.yaml"]
+      files:
+        - source: conf/trickster-rpc.yaml
+          target: /etc/trickster/trickster.yaml

@@ -1,0 +1,125 @@
+group: stale
+title: Serving stale responses
+description: The stale-while-revalidate and stale-if-error cache directives.
+refs: [RFC5861]
+tests:
+  - id: stale-while-revalidate-serves-stale
+    title: A stale response within the stale-while-revalidate window is served as it is
+    level: may
+    refs: [RFC5861#3]
+    responses:
+      original:
+        headers:
+          - "Cache-Control: max-age=1, stale-while-revalidate=60"
+          - "Date: ${now}"
+        body: the original body
+      updated:
+        headers:
+          - "Cache-Control: max-age=1, stale-while-revalidate=60"
+          - "Date: ${now}"
+        body: the updated body
+    steps:
+      - arrange: true
+        respond_with: original
+        expect: {status: 200, body: the original body, forwarded: true}
+      - wait: 2s
+      - respond_with: updated
+        expect:
+          status: 200
+          body: the original body
+
+  - id: stale-while-revalidate-window-ends
+    title: A response stale for longer than stale-while-revalidate is not served as it is
+    level: should
+    refs: [RFC5861#3]
+    requires: [stale-while-revalidate-serves-stale]
+    responses:
+      original:
+        headers:
+          - "Cache-Control: max-age=1, stale-while-revalidate=1"
+          - "Date: ${now}"
+        body: the original body
+      updated:
+        headers:
+          - "Cache-Control: max-age=1, stale-while-revalidate=1"
+          - "Date: ${now}"
+        body: the updated body
+    steps:
+      - arrange: true
+        respond_with: original
+        expect: {status: 200, body: the original body, forwarded: true}
+      - wait: 4s
+      - respond_with: updated
+        expect:
+          status: 200
+          body: the updated body
+
+  - id: stale-if-error-serves-stale
+    title: A stale response is served when revalidation meets a server error
+    level: may
+    refs: [RFC5861#4]
+    responses:
+      original:
+        headers:
+          - "Cache-Control: max-age=1, stale-if-error=60"
+          - "Date: ${now}"
+        body: the original body
+      broken:
+        status: 503
+        body: the origin is unwell
+    steps:
+      - arrange: true
+        respond_with: original
+        expect: {status: 200, body: the original body, forwarded: true}
+      - wait: 2s
+      - respond_with: broken
+        expect:
+          status: 200
+          body: the original body
+
+  - id: stale-if-error-window-ends
+    title: A response stale for longer than stale-if-error gives way to the error
+    level: should
+    refs: [RFC5861#4]
+    requires: [stale-if-error-serves-stale]
+    responses:
+      original:
+        headers:
+          - "Cache-Control: max-age=1, stale-if-error=1"
+          - "Date: ${now}"
+        body: the original body
+      broken:
+        status: 503
+        body: the origin is unwell
+    steps:
+      - arrange: true
+        respond_with: original
+        expect: {status: 200, body: the original body, forwarded: true}
+      - wait: 4s
+      - respond_with: broken
+        expect:
+          status: 503
+
+  - id: stale-if-error-does-not-cover-not-found
+    title: stale-if-error does not permit a stale response when the origin returns 404
+    level: must
+    refs: [RFC5861#4, RFC9111#4.2.4]
+    requires: [stale-if-error-serves-stale]
+    responses:
+      original:
+        headers:
+          - "Cache-Control: max-age=1, stale-if-error=60"
+          - "Date: ${now}"
+        body: the original body
+      missing:
+        status: 404
+        body: now missing
+    steps:
+      - arrange: true
+        respond_with: original
+        expect: {status: 200, forwarded: true}
+      - wait: 2s
+      - respond_with: missing
+        expect:
+          status: 404
+          body: now missing

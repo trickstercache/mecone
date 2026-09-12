@@ -1,0 +1,28 @@
+# The Trickster running on this machine, and nothing else. Use it to see what a local change does
+# to Trickster's HTTP compliance before it ships.
+#
+# Mecone neither starts nor configures this Trickster, so set it up yourself first:
+#
+#   1. Give it a backend named mecone1 with provider reverseproxycache, whose origin_url is
+#      http://127.0.0.1:8489 -- the port this catalog pins for that target's origin.
+#   2. Have it listen on port 8480, so its mecone1 backend answers at http://localhost:8480/mecone1.
+#   3. Start it, then run `make trickster-dev-test`.
+
+run:
+  protocols: [h1]
+  concurrency: 8
+  timeout: 30s
+
+targets:
+  # a Trickster already running on this machine, left alone by Mecone. Its origin binds a fixed
+  # port, since an unmanaged proxy cannot learn a port that changes every run.
+  # Must offer a mecone1 backend that routes to http://localhost:8489
+  - name: trickster-localdev-rp
+    proxy:
+      url: http://localhost:8480/mecone-rp
+      origin_port: 8487
+
+  - name: trickster-localdev-rpc
+    proxy:
+      url: http://localhost:8480/mecone-rpc
+      origin_port: 8488

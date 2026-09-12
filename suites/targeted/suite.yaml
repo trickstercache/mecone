@@ -1,0 +1,4 @@
+id: targeted
+title: Targeted Cache Control
+description: >-
+  Cache-Control fields addressed to one kind of cache, such as CDN-Cache-Control, per RFC 9213.

@@ -1,0 +1,57 @@
+group: stored
+title: Ranges from a stored response
+description: Range requests answered from a complete response the proxy already holds.
+refs: [RFC9110#14]
+tests:
+  - id: ranges-stored-suffix
+    title: A suffix range is served from a stored complete response
+    level: may
+    refs: [RFC9110#14.1.2, RFC9110#15.3.7]
+    requires: [storage-reuse-fresh]
+    responses:
+      alphabet:
+        headers: ["Cache-Control: max-age=3600"]
+        body: 0123456789abcdefghij
+        ranges: true
+    steps:
+      - arrange: true
+      - headers: ["Range: bytes=-5"]
+        expect:
+          status: 206
+          forwarded: false
+          headers: ["Content-Range: bytes 15-19/20"]
+          body: fghij
+
+  - id: ranges-stored-open-ended
+    title: An open-ended range is served from a stored complete response
+    level: may
+    refs: [RFC9110#14.1.2, RFC9110#15.3.7]
+    requires: [storage-reuse-fresh]
+    responses:
+      alphabet:
+        headers: ["Cache-Control: max-age=3600"]
+        body: 0123456789abcdefghij
+        ranges: true
+    steps:
+      - arrange: true
+      - headers: ["Range: bytes=15-"]
+        expect:
+          status: 206
+          forwarded: false
+          headers: ["Content-Range: bytes 15-19/20"]
+          body: fghij
+
+  - id: ranges-stored-unsatisfiable
+    title: An unsatisfiable range gets either 416 or the full response
+    level: must
+    refs: [RFC9110#14.2, RFC9110#15.5.17]
+    responses:
+      alphabet:
+        headers: ["Cache-Control: max-age=3600"]
+        body: 0123456789abcdefghij
+        ranges: true
+    steps:
+      - arrange: true
+      - headers: ["Range: bytes=5000-6000"]
+        expect:
+          status: [200, 416]
