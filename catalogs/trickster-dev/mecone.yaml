@@ -3,9 +3,11 @@
 #
 # Mecone neither starts nor configures this Trickster, so set it up yourself first:
 #
-#   1. Give it a backend named mecone1 with provider reverseproxycache, whose origin_url is
-#      http://127.0.0.1:8489 -- the port this catalog pins for that target's origin.
-#   2. Have it listen on port 8480, so its mecone1 backend answers at http://localhost:8480/mecone1.
+#   1. Give it two backends, each with the origin_url this catalog pins for that target:
+#        mecone-rp:  provider reverseproxy,      origin_url http://127.0.0.1:8497
+#        mecone-rpc: provider reverseproxycache, origin_url http://127.0.0.1:8498
+#   2. Have it listen on port 8480, so they answer at http://localhost:8480/mecone-rp and
+#      http://localhost:8480/mecone-rpc.
 #   3. Start it, then run `make trickster-dev-test`.
 
 run:
@@ -16,13 +18,12 @@ run:
 targets:
   # a Trickster already running on this machine, left alone by Mecone. Its origin binds a fixed
   # port, since an unmanaged proxy cannot learn a port that changes every run.
-  # Must offer a mecone1 backend that routes to http://localhost:8489
   - name: trickster-localdev-rp
     proxy:
       url: http://localhost:8480/mecone-rp
-      origin_port: 8487
+      origin_port: 8497
 
   - name: trickster-localdev-rpc
     proxy:
       url: http://localhost:8480/mecone-rpc
-      origin_port: 8488
+      origin_port: 8498

@@ -3,12 +3,14 @@
 #
 # trickster-localdev is not started or configured by Mecone, so set it up yourself first:
 #
-#   1. Give your local Trickster a backend named mecone1 with provider reverseproxycache, whose
-#      origin_url is http://127.0.0.1:8489 -- the port this catalog pins for that target's origin.
-#   2. Have it listen on port 8480, so its mecone1 backend answers at http://localhost:8480/mecone1.
+#   1. Give your local Trickster two backends, each with the origin_url this catalog pins for that target:
+#        mecone-rp:  provider reverseproxy,      origin_url http://127.0.0.1:8497
+#        mecone-rpc: provider reverseproxycache, origin_url http://127.0.0.1:8498
+#   2. Have it listen on port 8480, so they answer at http://localhost:8480/mecone-rp and
+#      http://localhost:8480/mecone-rpc.
 #   3. Start it, then run `make trickster-baseline-test`.
 #
-# conf/trickster.yaml is the same configuration, and is what trickster-latest runs.
+# conf/trickster-rp.yaml and conf/trickster-rpc.yaml are the same two setups, run by the docker targets.
 
 run:
   protocols: [h1]
@@ -42,7 +44,7 @@ targets:
   - name: trickster-localdev-rpc
     proxy:
       url: http://localhost:8480/mecone-rpc
-      origin_port: 8488
+      origin_port: 8498
 
 
   # latest points to the latest 2.x release, rp = configured as reverse proxy (no cache)
@@ -70,5 +72,5 @@ targets:
   - name: trickster-localdev-rp
     proxy:
       url: http://localhost:8480/mecone-rp
-      origin_port: 8487
+      origin_port: 8497
 

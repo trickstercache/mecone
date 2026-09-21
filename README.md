@@ -1,10 +1,25 @@
 # <img src="./docs/images/logos/mecone-horizontal.svg" width="550" />
 
-HTTP Protocol Compliance Tester • Pronounced like mě-CŌN-ē
+HTTP Protocol Compliance Tester • Pronounced like mě-CŌN-ē / McConey
 
 Mecone measures how closely a reverse proxy or reverse proxy cache follows the HTTP specifications. It runs on **both sides** of the proxy under test: a **client** in front of it and an **origin** behind it. The two halves coordinate, so every test sees the whole exchange — what the client sent and received, *and* what the proxy actually forwarded to the origin — and can then judge and score the proxy.
 
 Mecone is a companion project to [Trickster](https://github.com/trickstercache/trickster), but it works with any HTTP intermediary: CDNs, nginx, Varnish, Envoy, HAProxy, Apache Traffic Server, and so on.
+
+## Industry Tests
+
+You can run an industry-wide conformance test with a single command, testing Trickster, Nginx, HAProxy, Traefik, Envoy, Varnish, Squid and Apache Traffic Server. It takes under 1 minute (not counting container pulls).
+
+```
+make industry-test
+```
+
+### State of the Industry Reports
+
+We will run and publish quarterly 'State of the Industry' reports to this space, using the `industry-test` catalog. As Mecone evolves to include more exhaustive test cases, scores will change over time.
+
+* [2026 Q3 State of the Industry Report](./soti/2026-q3-soti.md)
+
 
 ## Why "Mecone"?
 
