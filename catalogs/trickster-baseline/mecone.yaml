@@ -23,7 +23,7 @@ targets:
     docker:
       image: ghcr.io/trickstercache/trickster
       tag: "2"
-      pull: missing
+      pull: always
       args: ["-config", "/etc/trickster/trickster.yaml"]
       files:
         - source: conf/trickster-rpc.yaml
@@ -34,7 +34,7 @@ targets:
     docker:
       image: ghcr.io/trickstercache/trickster
       tag: "main"
-      pull: missing
+      pull: always
       args: ["-config", "/etc/trickster/trickster.yaml"]
       files:
         - source: conf/trickster-rpc.yaml
@@ -52,7 +52,7 @@ targets:
     docker:
       image: ghcr.io/trickstercache/trickster
       tag: "2"
-      pull: missing
+      pull: always
       args: ["-config", "/etc/trickster/trickster.yaml"]
       files:
         - source: conf/trickster-rp.yaml
@@ -62,7 +62,7 @@ targets:
     docker:
       image: ghcr.io/trickstercache/trickster
       tag: "main"
-      pull: missing
+      pull: always
       args: ["-config", "/etc/trickster/trickster.yaml"]
       files:
         - source: conf/trickster-rp.yaml
