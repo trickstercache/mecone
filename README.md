@@ -16,7 +16,7 @@ make industry-test
 
 ### State of the Industry Reports
 
-We will run and publish quarterly 'State of the Industry' reports to this space, using the `industry-test` catalog. As Mecone evolves to include more exhaustive test cases, scores will change over time. For verification, you can run this test locally with `make industry-wide` and the results will be published to `catalogs/industry-wide/reports`.
+We will run and publish quarterly 'State of the Industry' reports to this space, using the `industry-test` catalog. As Mecone evolves to include more exhaustive test cases, scores will change over time. For verification, you can run this report locally with `make industry-wide` and the results will be published to `catalogs/industry-wide/reports`.
 
 * [2026 Q3 State of the Industry Report](./soti/2026-q3-soti.md)
 
